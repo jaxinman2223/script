@@ -1,0 +1,398 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
+
+local function createCmdsGui()
+    local existingGui = CoreGui:FindFirstChild("CmdsGui")
+    if existingGui then
+        existingGui:Destroy()
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "CmdsGui"
+    screenGui.Parent = CoreGui
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 400)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -200)
+    frame.BackgroundTransparency = 0
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
+
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 20, 0, 20)
+    closeButton.Position = UDim2.new(1, -25, 0, 5)
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    closeButton.TextScaled = true
+    closeButton.Font = Enum.Font.SourceSansBold
+    closeButton.BorderSizePixel = 0
+    closeButton.Parent = frame
+
+    closeButton.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "v1.6.6"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextScaled = true
+    title.Font = Enum.Font.SourceSansBold
+    title.Parent = frame
+
+    local commandBar = Instance.new("TextBox")
+    commandBar.Size = UDim2.new(1, 0, 0, 30)
+    commandBar.Position = UDim2.new(0, 0, 0, 30)
+    commandBar.BackgroundTransparency = 0
+    commandBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    commandBar.Text = ""
+    commandBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+    commandBar.TextScaled = true
+    commandBar.Font = Enum.Font.SourceSans
+    commandBar.ClearTextOnFocus = true
+    commandBar.BorderSizePixel = 0
+    commandBar.Parent = frame
+
+    local scrollingFrame = Instance.new("ScrollingFrame")
+    scrollingFrame.Size = UDim2.new(1, 0, 1, -60)
+    scrollingFrame.Position = UDim2.new(0, 0, 0, 60)
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 10, 0)
+    scrollingFrame.ScrollBarThickness = 8
+    scrollingFrame.BackgroundTransparency = 1
+    scrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255)
+    scrollingFrame.Parent = frame
+
+    local uiListLayout = Instance.new("UIListLayout")
+    uiListLayout.Parent = scrollingFrame
+    uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local commands = {
+        "/Sit",
+        "/unsit",
+        "/fly",
+        "/unfly",
+        "/reset",
+        "/cmds",
+        "/rejoin",
+        "/exit",
+        "/chatlogs"
+    }
+    
+    local commandLabels = {}
+
+    local function addCommandLabel(cmd)
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Size = UDim2.new(1, 0, 0, 30)
+        textLabel.Text = cmd
+        textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        textLabel.BackgroundTransparency = 1
+        textLabel.TextScaled = true
+        textLabel.Font = Enum.Font.SourceSansBold
+        textLabel.Parent = scrollingFrame
+        table.insert(commandLabels, textLabel)
+    end
+
+    for _, cmd in pairs(commands) do
+        addCommandLabel(cmd)
+    end
+
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y)
+
+    local dragging = false
+    local dragInput, mousePos, framePos
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            mousePos = input.Position
+            framePos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - mousePos
+            frame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+        end
+    end)
+
+    commandBar:GetPropertyChangedSignal("Text"):Connect(function()
+        local searchText = commandBar.Text:lower()
+        for _, label in ipairs(commandLabels) do
+            if searchText == "" or label.Text:lower():find(searchText) then
+                label.Visible = true
+            else
+                label.Visible = false
+            end
+        end
+    end)
+end
+
+local function toggleCmdsGui()
+    local existingGui = CoreGui:FindFirstChild("CmdsGui")
+    if existingGui then
+        existingGui.Enabled = not existingGui.Enabled
+    else
+        createCmdsGui()
+    end
+end
+
+local function resetCharacter()
+    if player.Character then
+        player.Character:BreakJoints()
+    end
+end
+
+local function rejoinGame()
+    TeleportService:Teleport(game.PlaceId, player)
+end
+
+local function exitGame()
+    player:Kick("You have left the game.")
+end
+
+local chatLogs = {}
+
+local function createChatLogsGui()
+    local existingGui = CoreGui:FindFirstChild("ChatLogsGui")
+    if existingGui then
+        existingGui:Destroy()
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ChatLogsGui"
+    screenGui.Parent = CoreGui
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 400, 0, 500)
+    frame.Position = UDim2.new(0.5, -200, 0.5, -250)
+    frame.BackgroundTransparency = 0
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
+
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 20, 0, 20)
+    closeButton.Position = UDim2.new(1, -25, 0, 5)
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    closeButton.TextScaled = true
+    closeButton.Font = Enum.Font.SourceSansBold
+    closeButton.BorderSizePixel = 0
+    closeButton.Parent = frame
+
+    closeButton.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+
+    local scrollingFrame = Instance.new("ScrollingFrame")
+    scrollingFrame.Size = UDim2.new(1, -20, 1, -60)
+    scrollingFrame.Position = UDim2.new(0, 10, 0, 50)
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 1, 0)
+    scrollingFrame.ScrollBarThickness = 0 -- Removed the scroll wheel
+    scrollingFrame.BackgroundTransparency = 1
+    scrollingFrame.Parent = frame
+
+    local uiListLayout = Instance.new("UIListLayout")
+    uiListLayout.Parent = scrollingFrame
+    uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local function addChatLog(log)
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Size = UDim2.new(1, 0, 0, 40)
+        textLabel.Text = log
+        textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        textLabel.BackgroundTransparency = 1
+        textLabel.TextScaled = true
+        textLabel.Font = Enum.Font.SourceSansBold
+        textLabel.Parent = scrollingFrame
+    end
+
+    local function updateChatLogs(message)
+        table.insert(chatLogs, message)
+        addChatLog(message)
+        scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y)
+        scrollingFrame.CanvasPosition = Vector2.new(0, scrollingFrame.AbsoluteCanvasSize.Y)
+    end
+
+    for _, p in pairs(Players:GetPlayers()) do
+        p.Chatted:Connect(function(message)
+            if not chatLogs[#chatLogs] or chatLogs[#chatLogs] ~= (p.Name .. ": " .. message) then
+                updateChatLogs(p.Name .. ": " .. message)
+            end
+        end)
+    end
+
+    Players.PlayerAdded:Connect(function(newPlayer)
+        newPlayer.Chatted:Connect(function(message)
+            if not chatLogs[#chatLogs] or chatLogs[#chatLogs] ~= (newPlayer.Name .. ": " .. message) then
+                updateChatLogs(newPlayer.Name .. ": " .. message)
+            end
+        end)
+    end)
+end
+
+local function teleportPlayer(message)
+    if message:sub(1, 3) == "/tp" then
+        local playerName = message:sub(5):lower()
+        local targetPlayer = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower():sub(1, #playerName) == playerName or p.DisplayName:lower():sub(1, #playerName) == playerName then
+                targetPlayer = p
+                break
+            end
+        end
+        if targetPlayer and targetPlayer.Character and targetPlayer.Character.PrimaryPart then
+            local targetPosition = targetPlayer.Character.PrimaryPart.Position
+            if player.Character and player.Character.PrimaryPart then
+                player.Character:SetPrimaryPartCFrame(CFrame.new(targetPosition + Vector3.new(0, 5, 0)))
+            else
+                warn("Local player's character or primary part not found!")
+            end
+        else
+            warn("Target player not found or invalid!")
+        end
+    elseif message:lower() == "/sit" then
+        if player.Character then
+            if player.Character.Humanoid.RigType == Enum.HumanoidRigType.R15 then
+                player.Character.Humanoid.Sit = true
+            elseif player.Character.Humanoid.RigType == Enum.HumanoidRigType.R6 then
+                player.Character.Humanoid.Sit = true
+                player.Character.Humanoid.Jump = true
+            end
+        end
+    elseif message:lower() == "/unsit" then
+        if player.Character then
+            player.Character.Humanoid.Sit = false
+        end
+    elseif message:lower() == "/fly" then
+        toggleFlying(true)
+    elseif message:lower() == "/unfly" then
+        toggleFlying(false)
+    elseif message:lower() == "/cmds" then
+        toggleCmdsGui()
+    elseif message:lower() == "/rejoin" then
+        rejoinGame()
+    elseif message:lower() == "/exit" then
+        exitGame()
+    elseif message:lower() == "/chatlogs" then
+        createChatLogsGui()
+    end
+end
+
+local function onChatted(message)
+    if message:lower() == "/reset" then
+        resetCharacter()
+    else
+        teleportPlayer(message)
+    end
+end
+
+player.Chatted:Connect(onChatted)
+
+local flying = false
+local speed = 50
+local bodyVelocity = nil
+local bodyGyro = nil
+
+local function startFlying()
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Velocity = Vector3.new(0, speed, 0)
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVelocity.Parent = player.Character.PrimaryPart
+
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.CFrame = player.Character.PrimaryPart.CFrame
+    bodyGyro.Parent = player.Character.PrimaryPart
+
+    player.Character.Humanoid.PlatformStand = true
+
+    while flying do
+        local moveDirection = Vector3.new()
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+            moveDirection = moveDirection + (workspace.CurrentCamera.CFrame.LookVector * speed)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
+            moveDirection = moveDirection - (workspace.CurrentCamera.CFrame.LookVector * speed)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+            moveDirection = moveDirection - (workspace.CurrentCamera.CFrame.RightVector * speed)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then
+            moveDirection = moveDirection + (workspace.CurrentCamera.CFrame.RightVector * speed)
+        end
+        
+        bodyVelocity.Velocity = moveDirection
+        bodyGyro.CFrame = workspace.CurrentCamera.CFrame
+        wait()
+    end
+end
+
+local function stopFlying()
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
+    player.Character.Humanoid.PlatformStand = false
+end
+
+function toggleFlying(enable)
+    flying = enable
+    if flying then
+        startFlying()
+    else
+        stopFlying()
+    end
+end
+
+local function onTouchSwipe(swipeDirection)
+    if flying then
+        local moveDirection = Vector3.new()
+        
+        if swipeDirection == Enum.SwipeDirection.Up then
+            moveDirection = moveDirection + (workspace.CurrentCamera.CFrame.LookVector * speed)
+        elseif swipeDirection == Enum.SwipeDirection.Down then
+            moveDirection = moveDirection - (workspace.CurrentCamera.CFrame.LookVector * speed)
+        elseif swipeDirection == Enum.SwipeDirection.Left then
+            moveDirection = moveDirection - (workspace.CurrentCamera.CFrame.RightVector * speed)
+        elseif swipeDirection == Enum.SwipeDirection.Right then
+            moveDirection = moveDirection + (workspace.CurrentCamera.CFrame.RightVector * speed)
+        end
+
+        bodyVelocity.Velocity = moveDirection
+        bodyGyro.CFrame = workspace.CurrentCamera.CFrame
+    end
+end
+
+UserInputService.TouchSwipe:Connect(onTouchSwipe)
